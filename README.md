@@ -32,7 +32,12 @@ Each ticket was sent to Jev once, with three questions in the same request:
 
 ## Results
 
-Run on 27 September 2026 against `jev-1.13.0`, with 100 of 100 tickets answered.
+Run on 27 September 2026 against `jev-1.13.0`, with 100 of 100 tickets answered. The full output is in the repo:
+
+- [`report.html`](report.html): the interactive report. Download it and open it in a browser, because GitHub shows HTML as source code.
+- [`results.json`](results.json): Jev's raw response for every ticket, with all probabilities and confidence scores.
+
+![Report overview: summary tiles, confidence routing chart and confusion matrix](docs/report-overview.png)
 
 | Measure | Result |
 |---|---|
@@ -60,6 +65,8 @@ With a 0.9 threshold, Jev would route 90% of tickets on its own with no errors a
 |---|---|---|---|
 | T016: "The coupon code SPRING24 … says 'invalid' at checkout" | billing | bug (84%, billing 16%) | Billing if the coupon is expired or restricted; a bug if checkout is broken |
 | T082: "Please let admins restrict who can create new projects" | feature_request | account (87%) | A new feature, or an existing permissions setting |
+
+![The two disagreements in the report's ticket table, with T016 expanded to show Jev's probabilities](docs/report-disagreements.png)
 
 We kept our original labels rather than changing them to match Jev, which would have made the test meaningless. Neither label is clearly wrong. The fair reading is 98 of 100, with both disagreements on tickets that could reasonably go either way. Under the 0.9 rule, both would have gone to a person.
 
@@ -115,12 +122,13 @@ In the table, **Expected** is our label and **Jev pick** is Jev's answer. A ✗ 
 
 | File | Purpose |
 |---|---|
-| `tickets.json` | The 100 labelled synthetic tickets |
-| `triage.py` | Sends tickets to Jev and writes `results.json` and `report.html` |
-| `report_template.html` | Report layout; the script fills in the data |
-| `results.json` | Raw Jev responses from the 27 Sep 2026 run |
-| `report.html` | Report from that run; download and open it in a browser |
-| `.env.example` | Template for the API key file; the real `.env` is git-ignored |
+| [`tickets.json`](tickets.json) | The 100 labelled synthetic tickets |
+| [`triage.py`](triage.py) | Sends tickets to Jev and writes `results.json` and `report.html` |
+| [`report_template.html`](report_template.html) | Report layout; the script fills in the data |
+| [`results.json`](results.json) | Raw Jev responses from the 27 Sep 2026 run |
+| [`report.html`](report.html) | Report from that run; download and open it in a browser |
+| [`docs/`](docs/) | Screenshots of the report used in this README |
+| [`.env.example`](.env.example) | Template for the API key file; the real `.env` is git-ignored |
 
 ## Possible next steps
 
