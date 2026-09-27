@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jev Ticket Triage</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --good: #006300; --bad: #d03b3b; --warn-bg: #fff4d6; --warn-ink: #6b4a00; --wrong-row: rgba(208,59,59,0.06);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+    --seq-0: #f0efec; --seq-1: #cde2fb; --seq-2: #86b6ef; --seq-3: #3987e5; --seq-4: #1c5cab; --seq-5: #0d366b; --cm-hi-ink: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+      --good: #0ca30c; --bad: #e66767; --warn-bg: #3a2e0c; --warn-ink: #fab219; --wrong-row: rgba(230,103,103,0.10);
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+      --seq-0: #262624; --seq-1: #104281; --seq-2: #184f95; --seq-3: #256abf; --seq-4: #3987e5; --seq-5: #6da7ec; --cm-hi-ink: #0b0b0b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --good: #0ca30c; --bad: #e66767; --warn-bg: #3a2e0c; --warn-ink: #fab219; --wrong-row: rgba(230,103,103,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --seq-0: #262624; --seq-1: #104281; --seq-2: #184f95; --seq-3: #256abf; --seq-4: #3987e5; --seq-5: #6da7ec; --cm-hi-ink: #0b0b0b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  [hidden] { display: none !important; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 60px; }
+  header h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--ink-2); }
+  .banner { margin: 16px 0 0; padding: 10px 14px; border-radius: 8px; background: var(--warn-bg); color: var(--warn-ink); font-weight: 600; }
+  h2 { font-size: 16px; margin: 0 0 4px; }
+  .sub { color: var(--ink-2); margin: 0 0 14px; font-size: 13px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  section { margin-top: 20px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 20px; }
+  .kpi .label { color: var(--ink-2); font-size: 12px; }
+  .kpi .value { font-size: 28px; font-weight: 650; margin-top: 2px; }
+  .kpi .note { color: var(--muted); font-size: 12px; }
+
+  .two { display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; }
+  .two > * { min-width: 0; }
+  @media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+  @media (max-width: 520px) { .route-stats { grid-template-columns: 1fr; } .kpi .value { font-size: 22px; } }
+
+  .slider-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .slider-row input { flex: 1 1 180px; accent-color: var(--s1); }
+  .slider-row output { font-weight: 650; font-variant-numeric: tabular-nums; min-width: 3ch; }
+  .route-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .route-stats div { border-left: 3px solid var(--grid); padding-left: 10px; }
+  .route-stats b { display: block; font-size: 20px; }
+  .route-stats span { color: var(--ink-2); font-size: 12px; }
+
+  .calib { display: grid; grid-template-columns: 34px 1fr; gap: 0 8px; height: 190px; }
+  .calib .yaxis { display: flex; flex-direction: column; justify-content: space-between; color: var(--muted); font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; padding-bottom: 36px; }
+  .calib .plot { position: relative; display: flex; flex-direction: column; }
+  .calib .bars { flex: 1; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--axis);
+    background: repeating-linear-gradient(to top, transparent 0, transparent calc(25% - 1px), var(--grid) calc(25% - 1px), var(--grid) 25%); }
+  .calib .col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; cursor: default; }
+  .calib .bar { width: 62%; max-width: 48px; background: var(--s1); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .calib .col.off .bar { opacity: 0.35; }
+  .calib .val { font-size: 11px; color: var(--ink-2); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+  .calib .xlabels { display: flex; gap: 2px; height: 36px; }
+  .calib .xlabels div { flex: 1; text-align: center; font-size: 11px; color: var(--muted); padding-top: 4px; line-height: 1.25; }
+
+  .cm { border-collapse: separate; border-spacing: 2px; font-variant-numeric: tabular-nums; width: 100%; min-width: 420px; table-layout: fixed; }
+  .cm tr > :first-child { width: 96px; }
+  .cm th { font-weight: 500; font-size: 11px; color: var(--ink-2); padding: 4px; }
+  .cm th.row { text-align: right; white-space: nowrap; }
+  .cm td { text-align: center; border-radius: 4px; height: 38px; font-weight: 600; font-size: 13px; }
+  .cm .axis-title { color: var(--muted); font-size: 11px; font-weight: 500; }
+  .overflow { overflow-x: auto; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--ink-2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; color: var(--ink-2); padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+  select, input[type=search] { font: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); }
+  input[type=search] { flex: 1 1 180px; }
+  .count { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+  table.tickets { min-width: 960px; width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tickets th { text-align: left; font-weight: 500; font-size: 12px; color: var(--ink-2); padding: 8px; border-bottom: 1px solid var(--axis); position: sticky; top: 0; background: var(--surface); z-index: 1; white-space: nowrap; }
+  .tickets td { padding: 10px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  .tickets tr.wrong td { background: var(--wrong-row); }
+  .tickets tr.main { cursor: pointer; }
+  .tickets tr.main:hover td { background: color-mix(in srgb, var(--s1) 6%, transparent); }
+  .tickets .id { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tickets .text { max-width: 340px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .pill i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .mark-ok { color: var(--good); font-weight: 700; }
+  .mark-bad { color: var(--bad); font-weight: 700; }
+  .conf { color: var(--ink-2); font-size: 12px; }
+  .stack { display: flex; gap: 2px; height: 14px; width: 190px; margin-top: 2px; }
+  .stack span { display: block; height: 100%; min-width: 0; }
+  .stack span:first-child { border-radius: 4px 0 0 4px; }
+  .stack span:last-child { border-radius: 0 4px 4px 0; }
+  .spark { display: flex; align-items: flex-end; gap: 2px; height: 22px; width: 60px; }
+  .spark span { flex: 1; background: var(--seq-2); border-radius: 2px 2px 0 0; min-height: 1px; }
+  .spark span.exp { background: var(--seq-4); }
+  .urg { display: flex; gap: 10px; align-items: center; }
+  .detail td { background: var(--page) !important; }
+  .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; font-size: 12px; }
+  .detail-grid h4 { margin: 0 0 6px; font-size: 12px; color: var(--ink-2); font-weight: 600; }
+  .detail-grid table { border-collapse: collapse; width: 100%; }
+  .detail-grid td { padding: 2px 4px; border: 0; background: none !important; }
+  .detail-grid td.num { text-align: right; }
+  .err { color: var(--bad); }
+
+  #tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--surface); font-size: 12px; padding: 6px 9px; border-radius: 6px; z-index: 10; max-width: 260px; opacity: 0; transition: opacity .08s; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Jev Ticket Triage</h1>
+    <p id="meta"></p>
+    <div class="banner" id="mockBanner" hidden>SIMULATED DATA: these answers are fake, generated by <code>--mock</code> to preview the report. Run without <code>--mock</code> to get Jev's real answers.</div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="two">
+    <div class="card">
+      <h2>Confidence routing</h2>
+      <p class="sub">Tickets with team confidence at or above the threshold are routed automatically. The rest go to a person, or to a bigger model.</p>
+      <div class="slider-row">
+        <label for="thr">Threshold</label>
+        <input id="thr" type="range" min="0" max="1" step="0.05" value="0.5">
+        <output id="thrOut">0.50</output>
+      </div>
+      <div class="route-stats" id="routeStats"></div>
+      <h2 style="font-size:13px">Is confidence trustworthy? Accuracy by confidence band</h2>
+      <p class="sub">If confidence is well calibrated, the bars step up from left to right. Dimmed bands fall below the threshold.</p>
+      <div class="calib">
+        <div class="yaxis"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div>
+        <div class="plot"><div class="bars" id="calBars"></div><div class="xlabels" id="calX"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Confusion matrix</h2>
+      <p class="sub">Rows show the expected team, columns show Jev's pick. The diagonal is correct.</p>
+      <div class="overflow"><table class="cm" id="cm"></table></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Every ticket</h2>
+    <p class="sub">The bar shows Jev's probability for each team. Click a row to see the exact numbers.</p>
+    <div class="legend" id="legend"></div>
+    <div class="filters">
+      <div class="seg" id="view">
+        <button data-v="all" aria-pressed="true">All</button>
+        <button data-v="wrong" aria-pressed="false">Wrong team</button>
+        <button data-v="low" aria-pressed="false">Below threshold</button>
+        <button data-v="churn" aria-pressed="false">Churn flagged</button>
+      </div>
+      <select id="teamFilter"><option value="">All expected teams</option></select>
+      <input type="search" id="q" placeholder="Search ticket text">
+      <span class="count" id="count"></span>
+    </div>
+    <div class="overflow">
+      <table class="tickets">
+        <thead><tr>
+          <th>ID</th><th>Ticket</th><th>Expected</th><th>Jev pick</th><th>Team probabilities</th>
+          <th>Urgency<br><span style="font-weight:400;color:var(--muted)">expected → Jev</span></th>
+          <th>Churn risk</th><th class="num">ms</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const { meta, results } = DATA;
+const TEAMS = Object.keys(meta.teams);
+const COLOR = Object.fromEntries(TEAMS.map((t, i) => [t, `var(--s${i + 1})`]));
+const LABEL = t => t.replace('_', ' ');
+const ok = results.filter(r => r.jev);
+const A = r => r.jev.answers;
+const pct = (x, d = 0) => (100 * x).toFixed(d) + '%';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const median = xs => { const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const teamRight = r => A(r).team.choice === r.team;
+const urgPred = r => Math.round(A(r).urgency.score) + 1;   // score is a 0-4 index; labels are 1-5
+const churnPred = r => A(r).churn_risk.noul >= 0.5;
+
+// ---- header & KPIs
+document.getElementById('meta').textContent =
+  `${ok.length} of ${results.length} tickets · model ${meta.model} · ${meta.run_at.replace('T', ' ')} · ${meta.wall_seconds.toFixed(1)}s wall time`;
+document.getElementById('mockBanner').hidden = meta.mode !== 'mock';
+
+const lat = ok.map(r => r.jev.latency_ms);
+const teamAcc = ok.filter(teamRight).length / ok.length;
+const urgExact = ok.filter(r => urgPred(r) === r.urgency).length / ok.length;
+const urgNear = ok.filter(r => Math.abs(urgPred(r) - r.urgency) <= 1).length / ok.length;
+const churnAcc = ok.filter(r => churnPred(r) === r.churn).length / ok.length;
+const churnPos = ok.filter(r => r.churn);
+const churnRecall = churnPos.filter(churnPred).length / (churnPos.length || 1);
+const per1k = meta.cost_usd / ok.length * 1000;
+const kpis = [
+  ['Team accuracy', pct(teamAcc), `${ok.filter(teamRight).length} of ${ok.length} routed correctly`],
+  ['Urgency within ±1', pct(urgNear), `${pct(urgExact)} exact on a 1–5 scale`],
+  ['Churn flag accuracy', pct(churnAcc), `caught ${churnPos.filter(churnPred).length} of ${churnPos.length} churn threats`],
+  ['Median latency', Math.round(median(lat)) + ' ms', `p90 ${Math.round([...lat].sort((a, b) => a - b)[Math.floor(lat.length * 0.9)])} ms per request`],
+  ['Cost of this run', '$' + meta.cost_usd.toFixed(5), `$${per1k.toFixed(4)} per 1,000 tickets · ${meta.input_tokens.toLocaleString()} tokens`],
+];
+if (results.length > ok.length) kpis.push(['Failed requests', results.length - ok.length, 'see rows marked error']);
+document.getElementById('kpis').innerHTML = kpis.map(([l, v, n]) =>
+  `<div class="card kpi"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join('');
+
+// ---- tooltip
+const tip = document.getElementById('tip');
+document.addEventListener('mousemove', e => {
+  const el = e.target.closest('[data-tip]');
+  if (!el) { tip.style.opacity = 0; return; }
+  tip.innerHTML = el.dataset.tip;
+  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8);
+  tip.style.left = x + 'px'; tip.style.top = (e.clientY + 14) + 'px'; tip.style.opacity = 1;
+});
+
+// ---- confidence routing + calibration
+const BANDS = [[0, .2], [.2, .4], [.4, .6], [.6, .8], [.8, .9], [.9, 1.0001]];
+const thr = document.getElementById('thr');
+function renderRouting() {
+  const t = +thr.value;
+  document.getElementById('thrOut').textContent = t.toFixed(2);
+  const auto = ok.filter(r => A(r).team.confidence >= t);
+  const autoAcc = auto.length ? auto.filter(teamRight).length / auto.length : NaN;
+  document.getElementById('routeStats').innerHTML = `
+    <div><b>${pct(auto.length / ok.length)}</b><span>routed automatically (${auto.length} tickets)</span></div>
+    <div><b>${isNaN(autoAcc) ? '–' : pct(autoAcc, 1)}</b><span>accuracy on those tickets</span></div>
+    <div><b>${ok.length - auto.length}</b><span>escalated to a human</span></div>`;
+  document.getElementById('calBars').innerHTML = BANDS.map(([lo, hi]) => {
+    const inB = ok.filter(r => { const c = A(r).team.confidence; return c >= lo && c < hi; });
+    const acc = inB.length ? inB.filter(teamRight).length / inB.length : 0;
+    const tipTxt = `Confidence ${lo.toFixed(1)}–${Math.min(hi, 1).toFixed(1)}<br>${inB.length} tickets · ${inB.length ? pct(acc) : 'n/a'} correct`;
+    return `<div class="col ${hi <= t ? 'off' : ''}" data-tip="${tipTxt}">
+      <div class="val">${inB.length ? pct(acc) : '–'}</div>
+      <div class="bar" style="height:${inB.length ? acc * 100 : 0}%"></div></div>`;
+  }).join('');
+  document.getElementById('calX').innerHTML = BANDS.map(([lo, hi]) => {
+    const n = ok.filter(r => { const c = A(r).team.confidence; return c >= lo && c < hi; }).length;
+    return `<div>${lo.toFixed(1)}–${Math.min(hi, 1).toFixed(1)}<br>n=${n}</div>`;
+  }).join('');
+  renderRows();
+}
+thr.addEventListener('input', renderRouting);
+
+// ---- confusion matrix
+(() => {
+  const m = Object.fromEntries(TEAMS.map(a => [a, Object.fromEntries(TEAMS.map(b => [b, 0]))]));
+  ok.forEach(r => m[r.team][A(r).team.choice]++);
+  const max = Math.max(...ok.length ? TEAMS.flatMap(a => TEAMS.map(b => m[a][b])) : [1]);
+  const shade = v => v === 0 ? 'var(--seq-0)' : `var(--seq-${Math.max(1, Math.ceil(5 * v / max))})`;
+  const inkOn = v => v / max > 0.5 ? 'var(--cm-hi-ink)' : 'var(--ink)';
+  let h = `<tr><th></th><th colspan="${TEAMS.length}" class="axis-title">Jev picked →</th></tr>`;
+  h += `<tr><th class="axis-title" style="text-align:right">Expected ↓</th>${TEAMS.map(t => `<th>${LABEL(t)}</th>`).join('')}</tr>`;
+  TEAMS.forEach(a => {
+    const rowN = TEAMS.reduce((s, b) => s + m[a][b], 0);
+    h += `<tr><th class="row">${LABEL(a)}</th>` + TEAMS.map(b => {
+      const v = m[a][b];
+      return `<td style="background:${shade(v)};color:${inkOn(v)};${a === b ? 'outline:2px solid var(--axis);outline-offset:-2px' : ''}"
+        data-tip="Expected <b>${LABEL(a)}</b>, Jev picked <b>${LABEL(b)}</b><br>${v} of ${rowN} tickets">${v || ''}</td>`;
+    }).join('') + '</tr>';
+  });
+  document.getElementById('cm').innerHTML = h;
+})();
+
+// ---- ticket table
+document.getElementById('legend').innerHTML = TEAMS.map(t => `<span><i style="background:${COLOR[t]}"></i>${LABEL(t)}</span>`).join('');
+const teamFilter = document.getElementById('teamFilter');
+teamFilter.innerHTML += TEAMS.map(t => `<option value="${t}">${LABEL(t)}</option>`).join('');
+let view = 'all';
+document.getElementById('view').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  view = b.dataset.v;
+  document.querySelectorAll('#view button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  renderRows();
+});
+teamFilter.addEventListener('change', renderRows);
+document.getElementById('q').addEventListener('input', renderRows);
+const open = new Set();
+document.getElementById('rows').addEventListener('click', e => {
+  const tr = e.target.closest('tr.main'); if (!tr) return;
+  const id = tr.dataset.id; open.has(id) ? open.delete(id) : open.add(id); renderRows();
+});
+
+const pill = t => `<span class="pill"><i style="background:${COLOR[t]}"></i>${LABEL(t)}</span>`;
+
+function detail(r) {
+  const a = A(r);
+  const tRows = TEAMS.map(t => `<tr><td>${pill(t)}</td><td class="num">${pct(a.team.probabilities[t] ?? 0, 1)}</td></tr>`).join('');
+  const uRows = meta.urgency_levels.map((l, i) => `<tr><td>${esc(l)}</td><td class="num">${pct(a.urgency.probabilities[i] ?? 0, 1)}</td></tr>`).join('');
+  return `<tr class="detail"><td></td><td colspan="7"><div class="detail-grid">
+    <div><h4>Team (Choice), confidence ${a.team.confidence.toFixed(3)}</h4><table>${tRows}</table></div>
+    <div><h4>Urgency (Score) = ${a.urgency.score.toFixed(2)} on 0–4, confidence ${a.urgency.confidence.toFixed(3)}</h4><table>${uRows}</table></div>
+    <div><h4>Churn risk (Noul)</h4><table><tr><td>P(yes)</td><td class="num">${a.churn_risk.noul.toFixed(3)}</td></tr>
+      <tr><td>Expected</td><td class="num">${r.churn ? 'yes' : 'no'}</td></tr>
+      <tr><td>Input tokens</td><td class="num">${r.jev.usage.input_tokens}</td></tr></table></div>
+  </div></td></tr>`;
+}
+
+function renderRows() {
+  const t = +thr.value, q = document.getElementById('q').value.toLowerCase(), tf = teamFilter.value;
+  const list = results.filter(r => {
+    if (tf && r.team !== tf) return false;
+    if (q && !r.text.toLowerCase().includes(q)) return false;
+    if (!r.jev) return view === 'all';
+    if (view === 'wrong') return !teamRight(r);
+    if (view === 'low') return A(r).team.confidence < t;
+    if (view === 'churn') return churnPred(r) || r.churn;
+    return true;
+  });
+  document.getElementById('count').textContent = `${list.length} shown`;
+  document.getElementById('rows').innerHTML = list.map(r => {
+    if (!r.jev) return `<tr><td class="id">${r.id}</td><td class="text">${esc(r.text)}</td><td>${pill(r.team)}</td><td colspan="5" class="err">error: ${esc(r.error)}</td></tr>`;
+    const a = A(r), right = teamRight(r);
+    const stack = TEAMS.map(tm => {
+      const p = a.team.probabilities[tm] ?? 0;
+      return p < 0.005 ? '' : `<span style="flex:${p};background:${COLOR[tm]}" data-tip="${LABEL(tm)}: ${pct(p, 1)}"></span>`;
+    }).join('');
+    const uProbs = [0, 1, 2, 3, 4].map(i => a.urgency.probabilities[i] ?? 0), uMax = Math.max(...uProbs);
+    const spark = uProbs.map((p, i) => `<span class="${i + 1 === r.urgency ? 'exp' : ''}" style="height:${100 * p / uMax}%" data-tip="Level ${i + 1}: ${pct(p, 1)}${i + 1 === r.urgency ? ' (expected)' : ''}"></span>`).join('');
+    const up = urgPred(r), uOk = Math.abs(up - r.urgency) <= 1;
+    const cOk = churnPred(r) === r.churn;
+    const low = a.team.confidence < t;
+    return `<tr class="main ${right ? '' : 'wrong'}" data-id="${r.id}">
+      <td class="id">${r.id}</td>
+      <td class="text">${esc(r.text)}</td>
+      <td>${pill(r.team)}</td>
+      <td><span class="${right ? 'mark-ok' : 'mark-bad'}">${right ? '✓' : '✗'}</span> ${pill(a.team.choice)}
+        <div class="conf num">conf ${a.team.confidence.toFixed(2)}${low ? ' · escalate' : ''}</div></td>
+      <td><div class="stack">${stack}</div></td>
+      <td><div class="urg"><span class="num">${r.urgency} → <b>${(a.urgency.score + 1).toFixed(1)}</b>
+        <span class="${uOk ? 'mark-ok' : 'mark-bad'}">${uOk ? '✓' : '✗'}</span></span><div class="spark">${spark}</div></div></td>
+      <td class="num">${pct(a.churn_risk.noul)} <span class="${cOk ? 'mark-ok' : 'mark-bad'}">${cOk ? '✓' : '✗'}</span>
+        <div class="conf">expected ${r.churn ? 'yes' : 'no'}</div></td>
+      <td class="num">${Math.round(r.jev.latency_ms)}</td>
+    </tr>` + (open.has(r.id) ? detail(r) : '');
+  }).join('');
+}
+
+renderRouting();
+</script>
+</body>
+</html>
