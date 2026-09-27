@@ -118,8 +118,8 @@ In the table, **Expected** is our label and **Jev pick** is Jev's answer. A ✗ 
 | `tickets.json` | The 100 labelled synthetic tickets |
 | `triage.py` | Sends tickets to Jev and writes `results.json` and `report.html` |
 | `report_template.html` | Report layout; the script fills in the data |
-| `results.json` | Raw Jev responses from the last run (git-ignored) |
-| `report.html` | Generated report (git-ignored) |
+| `results.json` | Raw Jev responses from the 27 Sep 2026 run |
+| `report.html` | Report from that run; download and open it in a browser |
 | `.env.example` | Template for the API key file; the real `.env` is git-ignored |
 
 ## Possible next steps
